@@ -1,0 +1,64 @@
+xv6 kernel is booting
+
+hart 9 starting
+hart 1 starting
+hart 15 starting
+hart 2 starting
+QEMU: Terminated
+kimdowne@KimDW-NOTEBOOK:~/xv6$ make CPUS=8 qemu
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 8 -nographic -global virtio-mmio.force-legacy=false -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+xv6 kernel is booting
+
+hart 2 starting
+hart 5 starting
+hart 1 starting
+hart 7 starting
+hart 6 starting
+hart 3 starting
+hart 4 starting
+init: starting sh
+$ forkbench
+parecccchnht: all ihldild 1 c(c hpidi 5l)0d: h(irp en did o4s)nei
+lpdhilar: etstepn t: al0l
+ep 0 ld c4 (pid 8): stehchild 0 (pid i l4): sp
+dteprcehn  do n1ei0
+child 4 (pi
+
+pchild 0l a(3p rdeintd 8:  1all dcd  h(pid il4d2  (pid 6): step 0
+chi7lrde 2 (pind )d:o)ne
+parent: :ste p(  aspt0il
+ld  c5h)ep 2
+): step 1
+child ildren done
+parent: all 1chci: l dhr(epni idd6o nsle )
+5): :d 3$ ste p s(t 2
+tep 1
+pid 7): step 1
+child 3 (pid 7): step 2
+ep 1c
+child 4 (pid h8i)l:d 2 (pi ds t6e)p 2:
+ step 2
+forkbench
+pccchichhiillcdhilad r4enhi  tl: al(pdllddi 0d 1  c4)h(i:l dp1i r(2p di3 s t (peind  e110): st 1eddpo p) n0e
+
+pacr:eh ild 0 (pid n 13t(: s0all children 10): stdep
+tcpehp i 10one
+pa
+
+crcid 12): step 0el)nh
+hiti: all children done
+parenlctdh: all cldhi  0i (pid ldren done
+parent: all chilld1dr0e 1n): step 2
+ (pid 11): step 1
+child 1 (pid 11): step  2
+dd o2n e:
+(pid 1$ 2 st): step 1
+child 2 4 (p(ipde 14): step 1
+child 4 (pid 14):ipd   102
+)chstep 2
+: step i2ld
+ 3 (pid 13): step 1
+child 3 (pid 13): step 2
+
+$
