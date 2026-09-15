@@ -153,6 +153,7 @@ UPROGS=\
 	$U/_hello\
 	$U/_forkbench\
 	$U/_filetest\
+	$U/_freetest\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
