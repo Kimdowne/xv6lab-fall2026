@@ -699,3 +699,17 @@ procdump(void)
     printk("\n");
   }
 }
+// Count processes whose state is not UNUSED.
+uint64
+nproc(void)                          
+{                                          
+  struct proc *p;                           // 현재 확인할 프로세스를 가리킨다.
+  uint64 n = 0;                            // 프로세스 수를 0으로 초기화한다.
+  for (p = proc; p < &proc[NPROC]; p++) {    // 프로세스 배열의 모든 슬롯을 순회한다.
+    acquire(&p->lock);                      // 상태를 읽는 동안 해당 프로세스를 잠근다.
+    if (p->state != UNUSED)                 // 비어 있는 슬롯이 아니면 센다.
+      n++;                                 // 프로세스 수를 하나 늘린다.
+    release(&p->lock);                      // 해당 프로세스의 잠금을 해제한다.
+  }                                        // 배열 순회 끝.
+  return n;                                // 집계한 프로세스 수를 반환한다.
+}                                          

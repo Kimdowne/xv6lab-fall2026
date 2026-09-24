@@ -6,6 +6,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "vm.h"
+#include "sysinfo.h"
 
 uint64
 sys_exit(void)
@@ -109,4 +110,26 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+uint64
+sys_freepages(void) // freepages 시스템 호출의 커널 진입 함수다.
+{                     
+  return freepages();     // kalloc.c에서 센 빈 페이지 수를 반환한다.
+}                         
+
+uint64
+sys_sysinfo(void)
+{
+  struct sysinfo info;
+  uint64 addr;
+
+
+  argaddr(0, &addr);        // 첫 번째 인자를 주소로 받는다
+
+  info.freepages = freepages();
+  info.nproc     = nproc();
+
+  *(struct sysinfo *)addr = info; // 실험: 사용자 주소에 직접 써서 커널 페이지 폴트를 관찰한다.
+  return 0;
 }
