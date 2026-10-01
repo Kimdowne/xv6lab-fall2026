@@ -122,6 +122,8 @@ freepages(void)
   r = kmem.freelist;
   while (r) {
     // TODO ①  count this page, then move to the next one
+    // 현재 마디는 빈 페이지 한 장이므로 n을 1 늘리고, r을 r->next로 옮긴다.
+    // 마지막 마디의 next가 0이면 while이 끝난다.
   }
 
   release(&kmem.lock);
@@ -176,6 +178,7 @@ uint64
 sys_freepages(void)
 {
   // TODO ②  call the function you wrote in kalloc.c
+  // freepages()가 센 페이지 수를 그대로 반환해 사용자에게 전달한다.
 }
 ```
 
@@ -288,6 +291,7 @@ nproc(void)
   for (p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
     // TODO ①  count this one if its state is not UNUSED
+    // p->state가 UNUSED가 아니면 n을 1 늘린다. 잠든 프로세스도 포함한다.
     release(&p->lock);
   }
   return n;
@@ -338,6 +342,9 @@ sys_sysinfo(void)
 
   // TODO ②  copy info out to the user address
   //        copyout(p->pagetable, p->sz, addr, ...) 를 씁니다
+  // 커널의 &info에서 sizeof(info)바이트를 사용자 가상 주소 addr로 복사한다.
+  // 사용자 주소는 페이지 테이블로 변환해야 하므로 직접 역참조하지 않는다.
+  // copyout이 실패하면 -1을 반환하고, 성공하면 아래의 return 0으로 진행한다.
 
   return 0;
 }
@@ -384,6 +391,9 @@ main(void)
   printf("nproc     = %lu\n", info.nproc);
 
   // TODO ③  fork a child, call sysinfo again, and see nproc change
+  // fork의 반환값으로 실패(<0), 자식(0), 부모(>0)를 구분한다.
+  // 자식이 살아 있거나 ZOMBIE인 동안 다시 조회하면 자식도 nproc에 포함된다.
+  // 자식은 exit하고 부모는 조회 후 wait로 회수한다. sysinfo의 실패도 확인한다.
 
   exit(0);
 }
