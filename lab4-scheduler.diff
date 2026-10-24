@@ -1,0 +1,280 @@
+diff --git a/Makefile b/Makefile
+index af1e7a5..b212823 100644
+--- a/Makefile
++++ b/Makefile
+@@ -32,7 +32,7 @@ OBJS = \
+ 
+ # riscv64-unknown-elf- or riscv64-linux-gnu-
+ # perhaps in /opt/riscv/bin
+-#TOOLPREFIX = 
++#TOOLPREFIX =
+ 
+ # Try to infer the correct TOOLPREFIX if not set
+ ifndef TOOLPREFIX
+@@ -91,7 +91,7 @@ endif
+ LDFLAGS = -z max-page-size=4096
+ 
+ $K/kernel: $(OBJS) $K/kernel.ld
+-	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS) 
++	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS)
+ 	$(OBJDUMP) -S $K/kernel > $K/kernel.asm
+ 	$(OBJDUMP) -t $K/kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $K/kernel.sym
+ 
+@@ -150,13 +150,14 @@ UPROGS=\
+ 	$U/_forphan\
+ 	$U/_dorphan\
+ 	$U/_sync\
++	$U/_priotest\
+ 
+ fs.img: mkfs/mkfs README $(UPROGS)
+ 	mkfs/mkfs fs.img README $(UPROGS)
+ 
+ -include kernel/*.d user/*.d
+ 
+-clean: 
++clean:
+ 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
+ 	*/*.o */*.d */*.asm */*.sym \
+ 	$K/kernel fs.img \
+diff --git a/kernel/proc.c b/kernel/proc.c
+index f4c1668..3303591 100644
+--- a/kernel/proc.c
++++ b/kernel/proc.c
+@@ -124,6 +124,7 @@ allocproc(void)
+ found:
+   p->pid = allocpid();
+   p->state = USED;
++  p->priority = 10;
+ 
+   // Allocate a trapframe page.
+   if ((p->trapframe = (struct trapframe *)kalloc()) == 0) {
+@@ -425,6 +426,8 @@ kwait(uint64 addr)
+ //  - swtch to start running that process.
+ //  - eventually that process transfers control
+ //    via swtch back to the scheduler.
++#define AGING 2   // [3번 질문]: 선택되지 못한 에이징 횟수 제한
++
+ void
+ scheduler(void)
+ {
+@@ -441,10 +444,20 @@ scheduler(void)
+     intr_on();
+     intr_off();
+ 
++    // [3번 질문]: 강의자료의 쉬운 구현 참조
++    int minprio = -1;
++    for (p = proc; p < &proc[NPROC]; p++) {
++      acquire(&p->lock);
++      if (p->state == RUNNABLE && (minprio == -1 || p->priority < minprio)) {
++        minprio = p->priority;
++      }
++      release(&p->lock);
++    }
++
+     int found = 0;
+     for (p = proc; p < &proc[NPROC]; p++) {
+       acquire(&p->lock);
+-      if (p->state == RUNNABLE) {
++      if (p->state == RUNNABLE && p->priority == minprio) {
+         // Switch to chosen process.  It is the process's job
+         // to release its lock and then reacquire it
+         // before jumping back to us.
+@@ -459,7 +472,23 @@ scheduler(void)
+         // It should have changed its p->state before coming back.
+         c->proc = 0;
+         found = 1;
++
++        // [3번 질무] 강의자료의 에이징 코드 구현
++        //p->priority = p->base_priority;   // 우선순위를 기본값으로 되돌림
++        //p->waited = 0;                    // 밀려난 횟수 초기화
++      }
++      /*
++      else if (p->state == RUNNABLE) {
++        if (++p->waited >= AGING) {
++          // 0아래로는 x이기 때문에 0 초과를 조건으로 동작.
++          if (p->priority > 0)
++            // 초반 구현에서 숫자가 작을수록 높은 순위였으므로, 빼기.
++            p->priority--;
++
++          p->waited = 0;
++        }
+       }
++      */
+       release(&p->lock);
+     }
+     if (found == 0) {
+diff --git a/kernel/proc.h b/kernel/proc.h
+index 5603697..f8e13a2 100644
+--- a/kernel/proc.h
++++ b/kernel/proc.h
+@@ -88,6 +88,10 @@ struct proc {
+   int killed;           // If non-zero, have been killed
+   int xstate;           // Exit status to be returned to parent's wait
+   int pid;              // Process ID
++  int priority;         // [3번 질문]: 프로세스의 우선 순위를 추가하기 위한 변수
++                        // 숫자가 작을수록 높은 우선순위
++  int base_priority;    // 프로세스의 기본 우선 순위를 저장하는 변수
++  int waited;           // 밀려난 횟수
+ 
+   // wait_lock must be held when using this:
+   struct proc *parent; // Parent process
+@@ -101,4 +105,5 @@ struct proc {
+   struct file *ofile[NOFILE];  // Open files
+   struct inode *cwd;           // Current directory
+   char name[16];               // Process name (debugging)
++
+ };
+diff --git a/kernel/syscall.c b/kernel/syscall.c
+index 1800f20..30941f6 100644
+--- a/kernel/syscall.c
++++ b/kernel/syscall.c
+@@ -103,6 +103,7 @@ extern uint64 sys_link(void);
+ extern uint64 sys_mkdir(void);
+ extern uint64 sys_close(void);
+ extern uint64 sys_sync(void);
++extern uint64 sys_set_priority(void); // [3번 질문]: 시스템 프로세스를 정의함.
+ 
+ // An array mapping syscall numbers from syscall.h
+ // to the function that handles the system call.
+@@ -130,6 +131,7 @@ static uint64 (*syscalls[])(void) = {
+   [SYS_mkdir]   = sys_mkdir,
+   [SYS_close]   = sys_close,
+   [SYS_sync]    = sys_sync,
++  [SYS_set_priority] = sys_set_priority, // [3번 질문]: 우선 순위 시스템 콜을 syscall 배열에 추가.
+   // clang-format on
+ };
+ 
+diff --git a/kernel/syscall.h b/kernel/syscall.h
+index 5a4a39f..0e170b0 100644
+--- a/kernel/syscall.h
++++ b/kernel/syscall.h
+@@ -21,3 +21,4 @@
+ #define SYS_mkdir  20
+ #define SYS_close  21
+ #define SYS_sync   22
++#define SYS_set_priority 23   // [3번 질문]: 우선순위 시스템 콜 추가
+\ No newline at end of file
+diff --git a/kernel/sysproc.c b/kernel/sysproc.c
+index cd25557..1e1dd10 100644
+--- a/kernel/sysproc.c
++++ b/kernel/sysproc.c
+@@ -110,3 +110,24 @@ sys_uptime(void)
+   release(&tickslock);
+   return xticks;
+ }
++
++// [3번 질문]: 강의자료에 있는 시스템 프로세스 구현
++// 시스템 콜 인자를 첫번째부터 정수로 읽고, 자료에서 지정한 우선순위만 허용함.
++// 그 후에 락을 획득하고, 우선순위를 n 값으로 변경합니다.
++// 락이 없을 경우, 이를 다른 프로세스가 우선순위를 변경하는 race condition이 발생할 수 있음.
++// 49페이지 처럼 priority와 base_priority를 모두 변경함.
++uint64
++sys_set_priority(void)
++{
++  int n;
++  argint(0, &n);
++  if (n < 0 || n > 20)
++  return -1;
++
++  struct proc *p = myproc();
++  acquire(&p->lock);
++  p->priority = n;
++  p->base_priority = n;
++  release(&p->lock);
++  return 0;
++  }
+\ No newline at end of file
+diff --git a/results/aging.png b/results/aging.png
+new file mode 100644
+index 0000000..d8a5ad1
+Binary files /dev/null and b/results/aging.png differ
+diff --git a/results/no_aging.png b/results/no_aging.png
+new file mode 100644
+index 0000000..c755832
+Binary files /dev/null and b/results/no_aging.png differ
+diff --git a/state b/state
+new file mode 100644
+index 0000000..e69de29
+diff --git a/user/priotest.c b/user/priotest.c
+new file mode 100644
+index 0000000..62f98be
+--- /dev/null
++++ b/user/priotest.c
+@@ -0,0 +1,45 @@
++#include "kernel/types.h"
++#include "user/user.h"
++
++// [3번 질문]: 강의자료의 코드 참조
++// 사용법: priotest [A] [B] [C]  (기본값1 10 10)
++// 같은 계산을 수행하는 자식 프로세스 세 개를 만든다.
++#define N 3
++
++int
++main(int argc, char *argv[])
++{
++  // 인자가 없으면 A=1, B=10, C=10을 사용한다.
++  int prio[N] = {1, 10, 10};
++
++  // 명령줄에서 지정한 우선순위를 기본값에 덮어씀.
++  for (int i = 0; i < N && i + 1 < argc; i++)
++    prio[i] = atoi(argv[i + 1]);
++
++  // 테스트 시작 시각을 기록한다.
++  int start = uptime();
++
++  for (int i = 0; i < N; i++) {
++    if (fork() == 0) {
++      // 각 자식이 자신의 우선순위를 설정.
++      set_priority(prio[i]);
++
++      // 세 자식 모두 같은 양의 계산을 수행.
++      volatile unsigned long x = 0;
++      for (unsigned long j = 0; j < 1500000000UL; j++)
++        x += j;
++
++      // CPU 사용량이 아니라 시작 후 종료까지의 경과 틱을 출력.
++      printf("%c (pid %d, prio %d) done at %d ticks\n",
++             'A' + i, getpid(), prio[i], uptime() - start);
++
++      exit(0);
++    }
++  }
++
++  // 부모는 세 자식의 종료를 기다림.
++  for (int i = 0; i < N; i++)
++    wait(0);
++
++  exit(0);
++}
+\ No newline at end of file
+diff --git a/user/user.h b/user/user.h
+index 29aad59..78f4f91 100644
+--- a/user/user.h
++++ b/user/user.h
+@@ -25,6 +25,7 @@ char *sys_sbrk(int, int);
+ int pause(int);
+ int uptime(void);
+ int sync(void);
++int set_priority(int); // [3번 질문]: 사용자 프로그램에서 우선순위 변경 시스템콜 정의
+ 
+ // ulib.c
+ int stat(const char *, struct stat *);
+diff --git a/user/usys.pl b/user/usys.pl
+index 4d054e8..672296f 100755
+--- a/user/usys.pl
++++ b/user/usys.pl
+@@ -20,7 +20,7 @@ sub entry {
+     print " ecall\n";
+     print " ret\n";
+ }
+-	
++
+ entry("fork");
+ entry("exit");
+ entry("wait");
+@@ -43,3 +43,4 @@ entry("sbrk");
+ entry("pause");
+ entry("uptime");
+ entry("sync");
++entry("set_priority"); # [3번 질문]: 시스템콜 호출코드 추가
+\ No newline at end of file
