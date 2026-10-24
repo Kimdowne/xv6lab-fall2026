@@ -20,7 +20,7 @@ sub entry {
     print " ecall\n";
     print " ret\n";
 }
-	
+
 entry("fork");
 entry("exit");
 entry("wait");
@@ -43,3 +43,4 @@ entry("sbrk");
 entry("pause");
 entry("uptime");
 entry("sync");
+entry("set_priority"); # [3번 질문]: 시스템콜 호출코드 추가

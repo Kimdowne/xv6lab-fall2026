@@ -124,6 +124,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->priority = 10;
 
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0) {
@@ -425,6 +426,8 @@ kwait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+#define AGING 2   // [3번 질문]: 선택되지 못한 에이징 횟수 제한
+
 void
 scheduler(void)
 {
@@ -441,10 +444,20 @@ scheduler(void)
     intr_on();
     intr_off();
 
+    // [3번 질문]: 강의자료의 쉬운 구현 참조
+    int minprio = -1;
+    for (p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if (p->state == RUNNABLE && (minprio == -1 || p->priority < minprio)) {
+        minprio = p->priority;
+      }
+      release(&p->lock);
+    }
+
     int found = 0;
     for (p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if (p->state == RUNNABLE) {
+      if (p->state == RUNNABLE && p->priority == minprio) {
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
@@ -459,7 +472,23 @@ scheduler(void)
         // It should have changed its p->state before coming back.
         c->proc = 0;
         found = 1;
+
+        // [3번 질무] 강의자료의 에이징 코드 구현
+        //p->priority = p->base_priority;   // 우선순위를 기본값으로 되돌림
+        //p->waited = 0;                    // 밀려난 횟수 초기화
       }
+      /*
+      else if (p->state == RUNNABLE) {
+        if (++p->waited >= AGING) {
+          // 0아래로는 x이기 때문에 0 초과를 조건으로 동작.
+          if (p->priority > 0)
+            // 초반 구현에서 숫자가 작을수록 높은 순위였으므로, 빼기.
+            p->priority--;
+
+          p->waited = 0;
+        }
+      }
+      */
       release(&p->lock);
     }
     if (found == 0) {

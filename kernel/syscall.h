@@ -21,3 +21,4 @@
 #define SYS_mkdir  20
 #define SYS_close  21
 #define SYS_sync   22
+#define SYS_set_priority 23   // [3번 질문]: 우선순위 시스템 콜 추가

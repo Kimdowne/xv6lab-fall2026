@@ -25,6 +25,7 @@ char *sys_sbrk(int, int);
 int pause(int);
 int uptime(void);
 int sync(void);
+int set_priority(int); // [3번 질문]: 사용자 프로그램에서 우선순위 변경 시스템콜 정의
 
 // ulib.c
 int stat(const char *, struct stat *);

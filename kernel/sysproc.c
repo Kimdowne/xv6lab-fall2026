@@ -110,3 +110,24 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// [3번 질문]: 강의자료에 있는 시스템 프로세스 구현
+// 시스템 콜 인자를 첫번째부터 정수로 읽고, 자료에서 지정한 우선순위만 허용함.
+// 그 후에 락을 획득하고, 우선순위를 n 값으로 변경합니다.
+// 락이 없을 경우, 이를 다른 프로세스가 우선순위를 변경하는 race condition이 발생할 수 있음.
+// 49페이지 처럼 priority와 base_priority를 모두 변경함.
+uint64
+sys_set_priority(void)
+{
+  int n;
+  argint(0, &n);
+  if (n < 0 || n > 20)
+  return -1;
+
+  struct proc *p = myproc();
+  acquire(&p->lock);
+  p->priority = n;
+  p->base_priority = n;
+  release(&p->lock);
+  return 0;
+  }

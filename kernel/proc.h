@@ -88,6 +88,10 @@ struct proc {
   int killed;           // If non-zero, have been killed
   int xstate;           // Exit status to be returned to parent's wait
   int pid;              // Process ID
+  int priority;         // [3번 질문]: 프로세스의 우선 순위를 추가하기 위한 변수
+                        // 숫자가 작을수록 높은 우선순위
+  int base_priority;    // 프로세스의 기본 우선 순위를 저장하는 변수
+  int waited;           // 밀려난 횟수
 
   // wait_lock must be held when using this:
   struct proc *parent; // Parent process
@@ -101,4 +105,5 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
 };
